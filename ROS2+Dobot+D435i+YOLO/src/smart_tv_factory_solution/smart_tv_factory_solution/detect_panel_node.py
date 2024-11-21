@@ -11,7 +11,6 @@ import torch
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
-# FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
 
 class Config:
     """상수 및 설정"""
@@ -21,25 +20,26 @@ class Config:
     CAMERA_RESOLUTION = (640, 480)  # 카메라 해상도
     CAMERA_FPS = 30  # 카메라 FPS
 
+
 class DetectPanelNode(Node):
     def __init__(self):
         super().__init__('detect_panel_node')
 
-        # 초기화 호출
         self.yolo_model = None
         self.pipeline = None
         self.server_socket = None
         self.client_socket = None
         self.bridge = None
 
+        # 상태 관리 변수
+        self.object_detected = False  # 이전 오브젝트 감지 여부
+        self.last_command = None      # 마지막으로 보낸 명령
+
         self.init_model()
         self.init_camera()
         self.init_socket()
         self.init_ros()
 
-    # ------------------------------
-    # 초기화 메서드
-    # ------------------------------
     def init_model(self):
         """YOLOv5 모델 초기화"""
         self.yolo_model = torch.hub.load('ultralytics/yolov5', 'custom', path='best.pt')
@@ -67,45 +67,19 @@ class DetectPanelNode(Node):
         self.image_publisher = self.create_publisher(Image, 'detection_image', 10)
         self.timer = self.create_timer(0.1, self.timer_callback)
 
-    # ------------------------------
-    # 클라이언트 관리
-    # ------------------------------
     def accept_client(self):
-        """소켓 클라이언트 연결 대기"""
+        """클라이언트 연결 대기"""
         self.client_socket, addr = self.server_socket.accept()
         self.get_logger().info(f'Client connected from {addr}')
 
-    def send_results(self, detection_results):
-        """탐지 결과를 클라이언트에 전송"""
+    def send_command(self, command):
+        """클라이언트로 명령 전송"""
         if self.client_socket:
             try:
-                result_data = '\n'.join([f'{label} {color}' for label, color, _, _, _, _ in detection_results])
-                self.client_socket.sendall(result_data.encode('utf-8') + b'\n')
+                self.client_socket.sendall(command.encode('utf-8') + b'\n')
             except BrokenPipeError:
                 self.get_logger().info('Client disconnected.')
                 self.client_socket = None
-
-    # ------------------------------
-    # 프레임 처리
-    # ------------------------------
-    def get_color_name(self, hsv_color):
-        """HSV 색상 값에서 이름 반환"""
-        h, s, v = hsv_color
-
-        # White: 높은 V와 낮은 S
-        if s < 50 and v > 200:
-            return 'white'
-
-        # Red: H가 0-10 또는 160-180 (빨간색은 양 끝에 위치)
-        if (0 <= h <= 10 or 160 <= h <= 180) and s > 100 and v > 100:
-            return 'red'
-
-        # Blue: H가 100-140 (파란색 범위)
-        if 100 <= h <= 140 and s > 100 and v > 100:
-            return 'blue'
-
-        return 'unknown'
-
 
     def get_center_color(self, image):
         """이미지 중심 영역의 평균 색상 반환"""
@@ -129,26 +103,66 @@ class DetectPanelNode(Node):
         detection_results = []
         for result in results.xyxy[0]:
             x1, y1, x2, y2, confidence, class_id = map(int, result[:6])
-            object_roi = roi_image[y1:y2, x1:x2]
-            center_color = self.get_center_color(object_roi)
-            color_name = self.get_color_name(center_color)
+
+            # 객체의 좌표를 원본 이미지 기준으로 변환
+            abs_x1 = roi_x1 + x1
+            abs_y1 = roi_y1 + y1
+            abs_x2 = roi_x1 + x2
+            abs_y2 = roi_y1 + y2
+
             label = self.yolo_model.names[class_id]
-            detection_results.append((label, color_name, x1, y1, x2, y2))
+
+            # 결과 저장
+            detection_results.append((label, abs_x1, abs_y1, abs_x2, abs_y2, confidence))
+
         return detection_results
 
     def annotate_frame(self, color_image, detection_results):
-        """탐지 결과를 프레임에 시각화"""
-        roi_x1, roi_y1, _, _ = Config.ROI_POSITION
-        for label, color_name, x1, y1, x2, y2 in detection_results:
-            cv2.rectangle(color_image, (roi_x1 + x1, roi_y1 + y1), (roi_x1 + x2, roi_y1 + y2), (0, 255, 0), 2)
-            cv2.putText(color_image, f'{label}-{color_name}', (roi_x1 + x1, roi_y1 + y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        """탐지 결과를 이미지에 시각화"""
+        roi_x1, roi_y1, roi_x2, roi_y2 = Config.ROI_POSITION
 
-    # ------------------------------
-    # ROS 타이머 콜백
-    # ------------------------------
+        # ROI 영역을 사각형으로 표시
+        cv2.rectangle(color_image, (roi_x1, roi_y1), (roi_x2, roi_y2), (0, 255, 255), 2)  # 노란색 ROI
+
+        # 탐지된 객체 정보 시각화
+        for label, x1, y1, x2, y2, confidence in detection_results:
+            # 객체 테두리 및 라벨 표시
+            cv2.rectangle(color_image, (x1, y1), (x2, y2), (0, 255, 0), 2)  # 초록색 테두리
+            text = f"{label} {confidence:.2f}"
+            cv2.putText(color_image, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        return color_image
+
+    def handle_detection(self, detection_results):
+        """
+        탐지 결과를 처리하여 명령 전송
+        - back_panel: 스텝 모터 작동 후 서보 모터로 왼쪽 분류
+        - board_panel: 스텝 모터 작동 후 서보 모터로 오른쪽 분류
+        """
+        if detection_results:  # 감지된 오브젝트가 있을 경우
+            if not self.object_detected:
+                self.send_command('1')  # 모터 실행
+                print("Object detected: Starting motor")
+                self.object_detected = True
+
+            for label, _, _, _, _, _ in detection_results:
+                if label == 'back_panel' and self.last_command != '3':
+                    self.send_command('3')  # 서보모터 왼쪽
+                    self.last_command = '3'
+                    print("Back panel detected: Moving servo to left")
+                elif label == 'board_panel' and self.last_command != '4':
+                    self.send_command('4')  # 서보모터 오른쪽
+                    self.last_command = '4'
+                    print("Board panel detected: Moving servo to right")
+        else:  # 감지된 오브젝트가 없을 경우
+            if self.object_detected:
+                self.send_command('2')  # 모터 정지
+                print("No object detected: Stopping motor")
+                self.object_detected = False
+                self.last_command = None
+
     def timer_callback(self):
-        """주기적으로 호출: 프레임 처리, 시각화 및 결과 전송"""
+        """주기적으로 호출: 프레임 처리, 시각화 및 명령 전송"""
         frames = self.pipeline.wait_for_frames()
         color_frame = frames.get_color_frame()
         if not color_frame:
@@ -156,16 +170,17 @@ class DetectPanelNode(Node):
 
         color_image = np.asanyarray(color_frame.get_data())
         detection_results = self.process_frame(color_image)
-        self.annotate_frame(color_image, detection_results)
-        self.send_results(detection_results)
+
+        # 탐지 결과에 따른 명령 처리
+        self.handle_detection(detection_results)
+
+        # 탐지 결과를 이미지에 시각화
+        annotated_image = self.annotate_frame(color_image, detection_results)
 
         # 이미지 퍼블리시
-        ros_image_message = self.bridge.cv2_to_imgmsg(color_image, encoding='bgr8')
+        ros_image_message = self.bridge.cv2_to_imgmsg(annotated_image, encoding='bgr8')
         self.image_publisher.publish(ros_image_message)
 
-    # ------------------------------
-    # 리소스 해제
-    # ------------------------------
     def destroy_node(self):
         """리소스 해제"""
         self.pipeline.stop()
