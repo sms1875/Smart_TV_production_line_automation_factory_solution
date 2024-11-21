@@ -1,0 +1,202 @@
+# -*- coding: utf-8 -*-
+import socket
+import gpiod
+import time
+import threading
+
+class Config:
+    """상수 및 설정"""
+    GPIO_CHIP = 'gpiochip0'  # GPIO 칩 이름
+    DIR_PIN = 17             # 모터 방향 제어 핀
+    STEP_PIN = 27            # 모터 스텝 제어 핀
+    ENABLE_PIN = 22          # 모터 활성화/비활성화 핀
+    SERVO_PIN = 18           # 서보 모터 핀
+
+    INITIAL_SPEED = 0.003    # 모터 초기 속도
+    TARGET_SPEED = 0.0015    # 모터 목표 속도
+    ACCELERATION_RATIO = 0.00001  # 가속/감속 비율
+
+    SERVER_HOST = '70.12.224.109'  # 서버 IP 주소
+    SERVER_PORT = 65432            # 서버 포트
+
+    SERVO_INITIAL_POSITION = 135  # 서보 초기 위치
+    SERVO_MAX_POSITION = 180      # 서보 최대 위치
+    SERVO_MIN_POSITION = 90       # 서보 최소 위치
+
+
+class GPIOManager:
+    """GPIO 핀 관리 클래스"""
+    def __init__(self):
+        self.chip = gpiod.Chip(Config.GPIO_CHIP)
+        self.lines = {}
+
+    def setup_pin(self, pin, consumer, direction=gpiod.LINE_REQ_DIR_OUT):
+        """핀 설정"""
+        line = self.chip.get_line(pin)
+        line.request(consumer=consumer, type=direction)
+        self.lines[pin] = line
+
+    def set_value(self, pin, value):
+        """핀 값 설정"""
+        if pin in self.lines:
+            self.lines[pin].set_value(value)
+
+    def release_all(self):
+        """모든 핀 해제"""
+        for line in self.lines.values():
+            line.release()
+
+
+class StepperMotor:
+    """스텝 모터 제어 클래스"""
+    def __init__(self, gpio_manager):
+        self.gpio = gpio_manager
+        self.speed = Config.INITIAL_SPEED
+        self.target_speed = Config.TARGET_SPEED
+        self.ratio = Config.ACCELERATION_RATIO
+        self.is_running = False
+        self.direction = 0  # 0: 정지, 1: CW, -1: CCW
+        self.is_accelerating = False
+
+        # 핀 초기화
+        self.gpio.setup_pin(Config.DIR_PIN, "dir")
+        self.gpio.setup_pin(Config.STEP_PIN, "step")
+        self.gpio.setup_pin(Config.ENABLE_PIN, "enable")
+
+    def set_direction(self, direction):
+        """모터 방향 설정"""
+        self.direction = direction
+        self.gpio.set_value(Config.DIR_PIN, 0 if direction == 1 else 1)
+
+    def start(self):
+        """모터 시작"""
+        if not self.is_running:
+            self.is_running = True
+            threading.Thread(target=self._run).start()
+
+    def stop(self):
+        """모터 정지"""
+        self.direction = 0
+        self.is_accelerating = False
+
+    def _run(self):
+        """모터 동작"""
+        self.gpio.set_value(Config.ENABLE_PIN, 0)  # 활성화
+        while self.is_running:
+            if self.is_accelerating and self.speed > self.target_speed:
+                self.speed -= self.ratio  # 가속
+            elif not self.is_accelerating and self.speed < Config.INITIAL_SPEED:
+                self.speed += self.ratio  # 감속
+
+            if self.direction == 0 and self.speed >= Config.INITIAL_SPEED:
+                self.is_running = False
+
+            # 한 스텝 실행
+            self.gpio.set_value(Config.STEP_PIN, 1)
+            time.sleep(self.speed)
+            self.gpio.set_value(Config.STEP_PIN, 0)
+            time.sleep(self.speed)
+
+    def disable(self):
+        """모터 비활성화"""
+        self.gpio.set_value(Config.ENABLE_PIN, 1)
+
+
+class ServoMotor:
+    """서보 모터 제어 클래스"""
+    def __init__(self, gpio_manager):
+        self.gpio = gpio_manager
+        self.gpio.setup_pin(Config.SERVO_PIN, "servo")
+
+    def set_angle(self, angle):
+        """서보 각도 설정"""
+        pulse_width = (angle / 270) * (0.0025 - 0.0005) + 0.0005
+        for _ in range(10):  # 안정적인 위치 이동
+            self.gpio.set_value(Config.SERVO_PIN, 1)
+            time.sleep(pulse_width)
+            self.gpio.set_value(Config.SERVO_PIN, 0)
+            time.sleep(0.02 - pulse_width)
+
+
+class Server:
+    """서버 통신 관리 클래스"""
+    def __init__(self):
+        self.host = Config.SERVER_HOST
+        self.port = Config.SERVER_PORT
+        self.socket = None
+
+    def connect(self):
+        """서버 연결"""
+        while True:
+            try:
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket.connect((self.host, self.port))
+                print(f"Connected to {self.host}:{self.port}")
+                return
+            except socket.error as e:
+                print(f"Connection failed: {e}. Retrying in 5 seconds...")
+                time.sleep(5)
+
+    def receive_command(self):
+        """명령 수신"""
+        try:
+            data = self.socket.recv(1024)
+            if not data:
+                return None
+            return data.decode('utf-8')
+        except socket.error as e:
+            print(f"Socket error: {e}")
+            return None
+
+    def close(self):
+        """소켓 닫기"""
+        if self.socket:
+            self.socket.close()
+
+
+class Controller:
+    """전체 제어를 담당하는 클래스"""
+    def __init__(self):
+        self.gpio = GPIOManager()
+        self.stepper_motor = StepperMotor(self.gpio)
+        self.servo_motor = ServoMotor(self.gpio)
+        self.server = Server()
+
+    def handle_command(self, command):
+        """명령 처리"""
+        if command == '1':  # 모터 시계 방향
+            self.stepper_motor.set_direction(1)
+            self.stepper_motor.start()
+        elif command == '2':  # 모터 정지
+            self.stepper_motor.stop()
+        elif command == '3':  # 서보 모터 180도
+            self.servo_motor.set_angle(Config.SERVO_MAX_POSITION)
+        elif command == '4':  # 서보 모터 초기화
+            self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
+        else:
+            print(f"Unknown command: {command}")
+
+    def cleanup(self):
+        """리소스 정리"""
+        self.stepper_motor.disable()
+        self.gpio.release_all()
+
+
+def main():
+    controller = Controller()
+
+    try:
+        controller.server.connect()
+        while True:
+            command = controller.server.receive_command()
+            if command is None:
+                break
+            controller.handle_command(command)
+    except KeyboardInterrupt:
+        print("Program terminated")
+    finally:
+        controller.cleanup()
+
+
+if __name__ == "__main__":
+    main()
