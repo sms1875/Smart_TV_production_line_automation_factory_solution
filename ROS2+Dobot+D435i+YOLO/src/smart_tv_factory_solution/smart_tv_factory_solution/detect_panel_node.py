@@ -150,9 +150,9 @@ class DetectPanelNode(Node):
                     self.send_command('3')  # 서보모터 왼쪽
                     self.last_command = '3'
                     print("Back panel detected: Moving servo to left")
-                elif label == 'board_panel' and self.last_command != '4':
-                    self.send_command('4')  # 서보모터 오른쪽
-                    self.last_command = '4'
+                elif label == 'board_panel' and self.last_command != '5':
+                    self.send_command('5')  # 서보모터 오른쪽
+                    self.last_command = '5'
                     print("Board panel detected: Moving servo to right")
         else:  # 감지된 오브젝트가 없을 경우
             if self.object_detected:
@@ -201,6 +201,7 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
         cv2.destroyAllWindows()
+        node.destroy_node()
 
 
 if __name__ == '__main__':
