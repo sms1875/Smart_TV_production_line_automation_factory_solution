@@ -12,12 +12,12 @@ class Config:
     ENABLE_PIN = 22          # 모터 활성화/비활성화 핀
     SERVO_PIN = 18           # 서보 모터 핀
 
-    INITIAL_SPEED = 0.003    # 모터 초기 속도
-    TARGET_SPEED = 0.0015    # 모터 목표 속도
+    INITIAL_SPEED = 0.002    # 모터 초기 속도
+    TARGET_SPEED = 0.0014    # 모터 목표 속도
     ACCELERATION_RATIO = 0.00001  # 가속/감속 비율
 
-    SERVER_HOST = '70.12.224.109'  # 서버 IP 주소
-    SERVER_PORT = 65432            # 서버 포트
+    SERVER_HOST = '192.168.110.107'  # 서버 IP 주소
+    SERVER_PORT = 12345            # 서버 포트
 
     SERVO_INITIAL_POSITION = 135  # 서보 초기 위치
     SERVO_MAX_POSITION = 180      # 서보 최대 위치
@@ -137,16 +137,16 @@ class Server:
                 print(f"Connection failed: {e}. Retrying in 5 seconds...")
                 time.sleep(5)
 
-    def receive_command(self):
+    def receive_commands(self):
         """명령 수신"""
         try:
             data = self.socket.recv(1024)
             if not data:
-                return None
-            return data.decode('utf-8')
+                return []
+            return data.decode('utf-8').strip().split('\n')
         except socket.error as e:
             print(f"Socket error: {e}")
-            return None
+            return []
 
     def close(self):
         """소켓 닫기"""
@@ -162,19 +162,65 @@ class Controller:
         self.servo_motor = ServoMotor(self.gpio)
         self.server = Server()
 
+        # 추가 상태 변수
+        self.motor_running = False
+        self.servo_position = Config.SERVO_INITIAL_POSITION
+
     def handle_command(self, command):
         """명령 처리"""
         if command == '1':  # 모터 시계 방향
-            self.stepper_motor.set_direction(1)
-            self.stepper_motor.start()
+            if not self.motor_running:
+                print("Starting motor CW")
+                self.stepper_motor.set_direction(1)
+                self.stepper_motor.start()
+                self.motor_running = True
+            else:
+                print("Stopping motor CW")
+                self.stepper_motor.stop()
+                self.motor_running = False
+            self.print_status()
+
         elif command == '2':  # 모터 정지
+            print("Stopping motor immediately")
             self.stepper_motor.stop()
-        elif command == '3':  # 서보 모터 180도
+            self.motor_running = False
+            self.print_status()
+
+        elif command == '3':  # 서보 모터 180도 후 초기화
+            print("Moving servo to 180 degrees")
             self.servo_motor.set_angle(Config.SERVO_MAX_POSITION)
-        elif command == '4':  # 서보 모터 초기화
+            time.sleep(6)  # 대기
+            print("Resetting servo to initial position")
             self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
+            self.print_status()
+
+        elif command == '4':  # 서보 모터 초기화 후 180도
+            print("Moving servo to 180 degrees")
+            self.servo_motor.set_angle(Config.SERVO_MAX_POSITION)
+            time.sleep(6)  # 대기
+            print("Resetting servo to initial position")
+            self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
+            self.print_status()
+
+        elif command == '5':  # 서보 모터 90도 후 초기화
+            print("Moving servo to 90 degrees")
+            self.servo_motor.set_angle(Config.SERVO_MIN_POSITION)
+            time.sleep(6)  # 대기
+            print("Resetting servo to initial position")
+            self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
+            self.print_status()
+
+        elif command == '6':  # 서보 모터 초기화
+            print("Resetting servo to initial position")
+            self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
+            self.print_status()
+       
         else:
-            print(f"Unknown command: {command}")
+            print(f"Unknown command received: {command}")
+    
+    def print_status(self):
+        """상태 정보 출력"""
+        print(f"Motor Running: {self.motor_running}, Servo Position: {self.servo_position}")
 
     def cleanup(self):
         """리소스 정리"""
@@ -188,10 +234,9 @@ def main():
     try:
         controller.server.connect()
         while True:
-            command = controller.server.receive_command()
-            if command is None:
-                break
-            controller.handle_command(command)
+            commands = controller.server.receive_commands()
+            for command in commands:
+                controller.handle_command(command.strip())
     except KeyboardInterrupt:
         print("Program terminated")
     finally:
