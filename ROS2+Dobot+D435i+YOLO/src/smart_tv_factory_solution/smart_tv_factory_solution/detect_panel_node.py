@@ -8,6 +8,7 @@ import pyrealsense2 as rs
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import torch
+import time
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -28,12 +29,18 @@ class DetectPanelNode(Node):
         self.yolo_model = None
         self.pipeline = None
         self.server_socket = None
-        self.client_socket = None
         self.bridge = None
+
+        # 다중 클라이언트 관리를 위한 리스트와 락
+        self.client_sockets = []
+        self.clients_lock = threading.Lock()
 
         # 상태 관리 변수
         self.object_detected = False  # 이전 오브젝트 감지 여부
         self.last_command = None      # 마지막으로 보낸 명령
+
+        self.detection_start_time = None  # 객체 감지 시작 시간
+        self.detection_duration_threshold = 1.0  # 1초 이상 유지될 경우 명령 전송
 
         self.init_model()
         self.init_camera()
@@ -55,10 +62,12 @@ class DetectPanelNode(Node):
     def init_socket(self):
         """소켓 서버 초기화"""
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((Config.SOCKET_HOST, Config.SOCKET_PORT))
-        self.server_socket.listen(1)
+        self.server_socket.listen(5)
         self.get_logger().info(f'Socket server listening on port {Config.SOCKET_PORT}')
-        self.client_thread = threading.Thread(target=self.accept_client)
+        self.client_thread = threading.Thread(target=self.accept_clients)
+        self.client_thread.daemon = True
         self.client_thread.start()
 
     def init_ros(self):
@@ -67,19 +76,33 @@ class DetectPanelNode(Node):
         self.image_publisher = self.create_publisher(Image, 'detection_image', 10)
         self.timer = self.create_timer(0.1, self.timer_callback)
 
-    def accept_client(self):
-        """클라이언트 연결 대기"""
-        self.client_socket, addr = self.server_socket.accept()
-        self.get_logger().info(f'Client connected from {addr}')
+    def accept_clients(self):
+        """클라이언트 연결 대기 및 관리"""
+        while True:
+            try:
+                client_socket, addr = self.server_socket.accept()
+                with self.clients_lock:
+                    self.client_sockets.append(client_socket)
+                self.get_logger().info(f'Client connected from {addr}')
+            except Exception as e:
+                self.get_logger().error(f'Error accepting client: {str(e)}')
+                break
 
     def send_command(self, command):
-        """클라이언트로 명령 전송"""
-        if self.client_socket:
-            try:
-                self.client_socket.sendall(command.encode('utf-8') + b'\n')
-            except BrokenPipeError:
-                self.get_logger().info('Client disconnected.')
-                self.client_socket = None
+        """모든 클라이언트로 명령 전송"""
+        with self.clients_lock:
+            disconnected_clients = []
+            for client_socket in self.client_sockets:
+                try:
+                    client_socket.sendall(command.encode('utf-8') + b'\n')
+                except (BrokenPipeError, ConnectionResetError):
+                    disconnected_clients.append(client_socket)
+                    
+            # 연결이 끊긴 클라이언트 제거
+            for client_socket in disconnected_clients:
+                self.client_sockets.remove(client_socket)
+                client_socket.close()
+                self.get_logger().info('Client disconnected')
 
     def get_center_color(self, image):
         """이미지 중심 영역의 평균 색상 반환"""
@@ -136,27 +159,34 @@ class DetectPanelNode(Node):
     def handle_detection(self, detection_results):
         """
         탐지 결과를 처리하여 명령 전송
-        - back_panel: 스텝 모터 작동 후 서보 모터로 왼쪽 분류
-        - board_panel: 스텝 모터 작동 후 서보 모터로 오른쪽 분류
+        - 1초 이상 객체가 유지되었을 경우 명령 전송
         """
         if detection_results:  # 감지된 오브젝트가 있을 경우
-            if not self.object_detected:
-                self.send_command('RUN')  # 모터 실행
-                print("Object detected: Starting motor")
-                self.object_detected = True
+            if self.detection_start_time is None:
+                # 감지가 처음 시작된 시간 기록
+                self.detection_start_time = time.time()
 
-            for label, _, _, _, _, _ in detection_results:
-                if label == 'back_panel' and self.last_command != 'BACK_PANEL':
-                    self.send_command('BACK_PANEL')  # 서보모터 왼쪽
-                    self.last_command = 'BACK_PANEL'
-                    print("Back panel detected: Moving servo to left")
-                elif label == 'board_panel' and self.last_command != 'BOARD_PANEL':
-                    self.send_command('BOARD_PANEL')  # 서보모터 오른쪽
-                    self.last_command = 'BOARD_PANEL'
-                    print("Board panel detected: Moving servo to right")
+            elapsed_time = time.time() - self.detection_start_time
+            if elapsed_time >= self.detection_duration_threshold:
+                # 객체가 1초 이상 유지된 경우
+                if not self.object_detected:
+                    self.send_command('1')  # 모터 실행
+                    print("Object detected for 1 second: Starting motor")
+                    self.object_detected = True
+
+                for label, _, _, _, _, _ in detection_results:
+                    if label == 'back_panel' and self.last_command != 'BACK_PANEL':
+                        self.send_command('3')  # 서보모터 왼쪽
+                        self.last_command = 'BACK_PANEL'
+                        print("Back panel detected for 1 second: Moving servo to left")
+                    elif label == 'board_panel' and self.last_command != 'BOARD_PANEL':
+                        self.send_command('5')  # 서보모터 오른쪽
+                        self.last_command = 'BOARD_PANEL'
+                        print("Board panel detected for 1 second: Moving servo to right")
         else:  # 감지된 오브젝트가 없을 경우
+            self.detection_start_time = None  # 감지 시간 초기화
             if self.object_detected:
-                self.send_command('STOP')  # 모터 정지
+                self.send_command('2')  # 모터 정지
                 print("No object detected: Stopping motor")
                 self.object_detected = False
                 self.last_command = None
@@ -184,8 +214,9 @@ class DetectPanelNode(Node):
     def destroy_node(self):
         """리소스 해제"""
         self.pipeline.stop()
-        if self.client_socket:
-            self.client_socket.close()
+        with self.clients_lock:
+            for client_socket in self.client_sockets:
+                client_socket.close()
         self.server_socket.close()
         super().destroy_node()
 
