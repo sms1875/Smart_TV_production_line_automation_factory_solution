@@ -1,7 +1,9 @@
 # Smart_TV_production_line_automation_factory_solution
 
 ## 소개
+
 스마트 TV 생산 라인의 효율성을 극대화하기 위한 자동화 솔루션입니다.
+
 Intel RealSense D435i 카메라와 YOLOv5 객체 탐지 모델을 활용하여 생산 과정의 상태를 모니터링하고 Dobot Magician 로봇 암과 컨베이어 벨트를 ROS2 기반으로 제어합니다.
 
 **Youtube 시연 영상**: https://www.youtube.com/watch?v=IgKFjTNAdM4
