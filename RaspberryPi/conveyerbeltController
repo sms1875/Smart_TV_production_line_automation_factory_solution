@@ -168,7 +168,7 @@ class Controller:
 
     def handle_command(self, command):
         """명령 처리"""
-        if command == 'RUN':  # 모터 시계 방향
+        if command == 'CONV_STEP_MOTOR_RUN':  # 모터 시계 방향
             if not self.motor_running:
                 print("Starting motor CW")
                 self.stepper_motor.set_direction(1)
@@ -180,7 +180,7 @@ class Controller:
                 self.motor_running = False
             self.print_status()
 
-        elif command == 'STOP':  # 모터 정지
+        elif command == 'CONV_STEP_MOTOR_STOP':  # 모터 정지
             print("Stopping motor immediately")
             self.stepper_motor.stop()
             self.motor_running = False
