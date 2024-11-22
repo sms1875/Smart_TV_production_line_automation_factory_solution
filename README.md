@@ -2,17 +2,24 @@
 ## 소개
 스마트 TV 생산 라인 자동화 팩토리 솔루션 프로젝트입니다
 
-
 **Youtube 시연 영상**: https://www.youtube.com/watch?v=IgKFjTNAdM4
-
-https://github.com/user-attachments/assets/74af9277-5f39-47e5-959e-9d062d752e95
 
 ## 개발 환경
 
-- Tools: VS Code, Docker
-- Front: Flutter
-- ROS: ROS TurtleSim 패키지, rosbridge server
-- 데이터 관리: Provider (상태 관리), WebSocket (통신)
+### Server
+- Ubuntu + ROS2
+- Realsense D435i + Yolov5
+- websocket
+
+### Conveyor belt
+- Raspberry pi
+
+### Robot
+- Dobot magician
+- ROS2
+
+### Simulation
+- RoboDK
 
 ## 기능 설명
 
