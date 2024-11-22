@@ -215,6 +215,3 @@ def simulate_back_panel():
     program.RunProgram()
 ```
 
----
-
-이 문서는 스마트 TV 생산 라인의 자동화를 위한 전체 구성 요소와 동작을 설명합니다.
