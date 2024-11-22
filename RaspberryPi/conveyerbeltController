@@ -168,7 +168,7 @@ class Controller:
 
     def handle_command(self, command):
         """명령 처리"""
-        if command == 'CONV_STEP_MOTOR_RUN':  # 모터 시계 방향
+        if command == '1':  # 모터 시계 방향
             if not self.motor_running:
                 print("Starting motor CW")
                 self.stepper_motor.set_direction(1)
@@ -180,13 +180,13 @@ class Controller:
                 self.motor_running = False
             self.print_status()
 
-        elif command == 'CONV_STEP_MOTOR_STOP':  # 모터 정지
+        elif command == '2':  # 모터 정지
             print("Stopping motor immediately")
             self.stepper_motor.stop()
             self.motor_running = False
             self.print_status()
 
-        elif command == 'BACK_PANEL':  # 서보 모터 180도 후 초기화
+        elif command == '3':  # 서보 모터 180도 후 초기화
             print("Moving servo to 180 degrees")
             self.servo_motor.set_angle(Config.SERVO_MAX_POSITION)
             time.sleep(6)  # 대기
@@ -202,7 +202,7 @@ class Controller:
         #     self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
         #     self.print_status()
 
-        elif command == 'BOARD_PANEL':  # 서보 모터 90도 후 초기화
+        elif command == '5':  # 서보 모터 90도 후 초기화
             print("Moving servo to 90 degrees")
             self.servo_motor.set_angle(Config.SERVO_MIN_POSITION)
             time.sleep(6)  # 대기
