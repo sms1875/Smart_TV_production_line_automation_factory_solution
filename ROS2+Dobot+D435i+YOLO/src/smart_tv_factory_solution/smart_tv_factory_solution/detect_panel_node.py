@@ -141,22 +141,22 @@ class DetectPanelNode(Node):
         """
         if detection_results:  # 감지된 오브젝트가 있을 경우
             if not self.object_detected:
-                self.send_command('1')  # 모터 실행
+                self.send_command('RUN')  # 모터 실행
                 print("Object detected: Starting motor")
                 self.object_detected = True
 
             for label, _, _, _, _, _ in detection_results:
-                if label == 'back_panel' and self.last_command != '3':
-                    self.send_command('3')  # 서보모터 왼쪽
-                    self.last_command = '3'
+                if label == 'back_panel' and self.last_command != 'BACK_PANEL':
+                    self.send_command('BACK_PANEL')  # 서보모터 왼쪽
+                    self.last_command = 'BACK_PANEL'
                     print("Back panel detected: Moving servo to left")
-                elif label == 'board_panel' and self.last_command != '5':
-                    self.send_command('5')  # 서보모터 오른쪽
-                    self.last_command = '5'
+                elif label == 'board_panel' and self.last_command != 'BOARD_PANEL':
+                    self.send_command('BOARD_PANEL')  # 서보모터 오른쪽
+                    self.last_command = 'BOARD_PANEL'
                     print("Board panel detected: Moving servo to right")
         else:  # 감지된 오브젝트가 없을 경우
             if self.object_detected:
-                self.send_command('2')  # 모터 정지
+                self.send_command('STOP')  # 모터 정지
                 print("No object detected: Stopping motor")
                 self.object_detected = False
                 self.last_command = None
