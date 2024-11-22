@@ -1,9 +1,7 @@
 # Smart_TV_production_line_automation_factory_solution
 ## 소개
+스마트 TV 생산 라인 자동화 팩토리 솔루션 프로젝트입니다
 
- 스마트 TV 생산 라인 자동화 팩토리 솔루션 프로젝트입니다
- 
-**깃허브 링크:** https://github.com/sms1875/Flutter-ROS2
 
 **Youtube 시연 영상**: https://www.youtube.com/watch?v=IgKFjTNAdM4
 
