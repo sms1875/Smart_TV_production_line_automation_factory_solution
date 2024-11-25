@@ -20,6 +20,7 @@ class Config:
     SOCKET_HOST = '0.0.0.0'  # 모든 인터페이스에서 접속 허용
     CAMERA_RESOLUTION = (640, 480)  # 카메라 해상도
     CAMERA_FPS = 30  # 카메라 FPS
+    MODEL_PATH = '/home/ssafy/work/Smart_TV_production_line_automation_factory_solution/ROS2+Dobot+D435i+YOLO/src/smart_tv_factory_solution/models/detect_panel_model.pt'
 
 
 class DetectPanelNode(Node):
@@ -49,7 +50,7 @@ class DetectPanelNode(Node):
 
     def init_model(self):
         """YOLOv5 모델 초기화"""
-        self.yolo_model = torch.hub.load('ultralytics/yolov5', 'custom', path='/home/ssafy/work/Smart_TV_production_line_automation_factory_solution/ROS2+Dobot+D435i+YOLO/src/smart_tv_factory_solution/models/detect_panel_model.pt')
+        self.yolo_model = torch.hub.load('ultralytics/yolov5', 'custom', path=Config.MODEL_PATH)
         self.yolo_model.eval()
 
     def init_camera(self):
