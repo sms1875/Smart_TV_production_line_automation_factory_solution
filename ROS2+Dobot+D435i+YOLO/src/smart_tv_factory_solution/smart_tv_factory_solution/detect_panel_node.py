@@ -49,7 +49,7 @@ class DetectPanelNode(Node):
 
     def init_model(self):
         """YOLOv5 모델 초기화"""
-        self.yolo_model = torch.hub.load('ultralytics/yolov5', 'custom', path='best.pt')
+        self.yolo_model = torch.hub.load('ultralytics/yolov5', 'custom', path='/home/ssafy/work/Smart_TV_production_line_automation_factory_solution/ROS2+Dobot+D435i+YOLO/src/smart_tv_factory_solution/models/detect_panel_model.pt')
         self.yolo_model.eval()
 
     def init_camera(self):

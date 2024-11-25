@@ -1,4 +1,5 @@
 from setuptools import find_packages, setup
+from glob import glob
 
 package_name = 'smart_tv_factory_solution'
 
@@ -10,6 +11,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,6 +22,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'robot_teaching=smart_tv_factory_solution.robot_teaching:main',
+            'dobot_control_node=smart_tv_factory_solution.dobot_control_node:main',
             'detect_panel_node = smart_tv_factory_solution.detect_panel_node:main'
         ],
     },
