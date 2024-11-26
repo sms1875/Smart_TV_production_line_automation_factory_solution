@@ -82,14 +82,98 @@ def move_left():
 - Dobot Magician을 사용하여 패널을 조립 구역으로 옮깁니다
 - ROS2 Action Client를 통해 로봇 암의 위치를 제어하고 흡착컵을 사용하여 패널을 픽업합니다
   
+**흡착컵 동작 구현**
+
+- 흡착컵은 패널을 잡고 놓는 데 사용됩니다. 
+- set_suction 메서드는 흡착 활성화 또는 비활성화를 수행합니다.
+- 흡착 상태를 제어하기 위해 state 값이 "on"이면 흡착컵을 활성화하고, "off"면 비활성화합니다.
+
 ```python
-def move_board_panel():
-    """보드 패널을 컨베이어로 이동"""
-    device.move_to(250, 0, 50, 0)
-    device.suck(True)
-    device.move_to(250, 0, -50, 0)
-    device.move_to(150, 100, 50, 0)
-    device.suck(False)
+def set_suction(self, enable: bool):
+    """
+    흡착컵 제어 명령을 보냄
+    :param enable: 흡착 활성화(True) 또는 비활성화(False)
+    """
+    req = SuctionCupControl.Request()
+    req.enable_suction = enable
+
+    self.get_logger().info(f'Setting suction: {"ON" if enable else "OFF"}')
+    while not self.suction_service_client.wait_for_service(timeout_sec=1.0):
+        self.get_logger().warn('/dobot_suction_cup_service not available, waiting...')
+
+    future = self.suction_service_client.call_async(req)
+    future.add_done_callback(self.suction_response_callback)
+```
+**PTP 이동 명령 구현**
+
+- send_ptp_goal 메서드는 두봇이 지정된 위치로 이동하도록 합니다.
+- motion_type은 이동 유형을 결정하며, position은 목표 좌표입니다.
+
+```python
+def send_ptp_goal(self, motion_type, target_pose):
+    """
+    PTP(Point-to-Point) 이동 명령을 보냄
+    :param motion_type: 이동 유형 (1: PTP Motion)
+    :param target_pose: 목표 위치 [x, y, z, r]
+    """
+    goal_msg = PointToPoint.Goal()
+    goal_msg.motion_type = motion_type
+    goal_msg.target_pose = target_pose
+    goal_msg.velocity_ratio = Config.PTP_DEFAULT_VELOCITY
+    goal_msg.acceleration_ratio = Config.PTP_DEFAULT_ACCELERATION
+
+    self.get_logger().info(f'Sending PTP goal: {goal_msg}')
+    self.ptp_action_client.wait_for_server()
+    future = self.ptp_action_client.send_goal_async(goal_msg)
+    future.add_done_callback(self.ptp_goal_response_callback)
+```
+
+**Homing 서비스 호출**
+
+- 두봇이 작업을 시작하기 전 초기 위치로 복귀하도록 execute_homing 메서드를 호출합니다.
+
+```python
+def execute_homing(self):
+    """
+    Homing 서비스 호출
+    """
+    req = ExecuteHomingProcedure.Request()
+    self.get_logger().info('Waiting for Homing service...')
+    while not self.homing_service_client.wait_for_service(timeout_sec=1.0):
+        self.get_logger().warn('/dobot_homing_service not available, waiting...')
+
+    self.get_logger().info('Calling Homing service...')
+    future = self.homing_service_client.call_async(req)
+    rclpy.spin_until_future_complete(self, future)
+
+    if future.result() is not None:
+        self.get_logger().info(f'Homing service completed successfully: {future.result()}')
+    else:
+        self.get_logger().error('Homing service failed.')
+```
+
+**JSON 작업 실행**
+- 작업을 JSON 파일에서 저장하고 읽어 순차적으로 실행합니다.
+- 작업 단계는 이동(move)과 흡착컵 제어(gripper)로 구성됩니다.
+
+```python
+def execute_task(dobot_controller, task):
+    """
+    단일 작업(Task)을 실행
+    :param dobot_controller: DobotController 객체
+    :param task: 실행할 작업(Task) 데이터
+    """
+    dobot_controller.get_logger().info(f"Starting Task: {task['name']}")
+    for step in task["steps"]:
+        if step["event"] == "move":
+            dobot_controller.send_ptp_goal(
+                motion_type=step["motion_type"],
+                target_pose=step["position"]
+            )
+            time.sleep(Config.MOVE_WAIT_TIME)
+        elif step["event"] == "gripper":
+            dobot_controller.set_suction(step["state"] == "on")
+            time.sleep(Config.SUCTION_WAIT_TIME)
 ```
 
 ### RoboDK 시뮬레이션
