@@ -6,20 +6,14 @@
 
 - Intel RealSense D435i 카메라와 YOLOv5 모델을 사용하여 패널의 종류를 실시간으로 분류합니다
 - Dobot Magician 로봇 암 및 컨베이어 벨트를 제어하여 패널을 분류 및 이동합니다
-- ROS2 기반으로 데이터 통신과 장비 간 동작을 관리하며 RoboDK 시뮬레이션을 통해 작업 환경을 테스트합니다
-
----
-
-## 시연 영상
-
-[스마트 TV 생산 라인 자동화 시연 영상](https://www.youtube.com/watch?v=IgKFjTNAdM4)
+- ROS2를 통한 데이터 통신과 장비 간 동작을 관리하며 RoboDK 시뮬레이션을 통해 작업 환경을 테스트합니다
 
 ---
 
 ## 개발 환경
 
 - **운영 체제**: Ubuntu 20.04 (서버), Raspberry Pi OS (컨베이어 제어)
-- **프로그래밍 언어**: Python 3.8
+- **프로그래밍 언어**: Python 3.8, JavaScript (Vue.js)
 - **주요 하드웨어**:
     - Dobot Magician (로봇)
     - Intel RealSense D435i (카메라)
@@ -28,6 +22,8 @@
     - YOLOv5 (객체 탐지 모델)
     - ROS2 (로봇 제어 및 데이터 통신)
     - RoboDK (시뮬레이션)
+    - Django (백엔드 서버)
+    - Vue.js (프론트엔드)
 
 ---
 
@@ -44,6 +40,11 @@
     - 탐지된 패널 정보를 기반으로 좌우 이동
 - RoboDK 시뮬레이션:
     - 패널 종류에 따라 작업을 시뮬레이션
+-  프론트엔드:
+    - 매크로 관리 인터페이스를 통해 작업을 생성, 수정 및 실행
+- 백엔드:
+    - 매크로 데이터 저장 및 관리, 장비와의 실시간 통신 지원
+
 
 ---
 
@@ -465,13 +466,165 @@ asyncio.run(main())
 
 ```
 
-### ROS2 기반 통신 및 동기화
+### 프론트엔드
+- Vue.js를 기반으로 매크로 관리 인터페이스를 개발하여 로봇 및 컨베이어 동작을 직관적으로 제어하고 작업 흐름을 확인
 
-- ROS2를 통해 장치 간 데이터를 송수신하고 동작을 제어합니다
-- YOLOv5의 탐지 결과를 ROS2 토픽으로 퍼블리시하며, Dobot Magician 및 컨베이어 벨트 제어를 동기화합니다
+**주요 기능**
+- 매크로 관리: 작업 정의 및 실행, 개별 단계 관리
+- 실시간 작업 상태 확인: 작업 흐름 실행 결과를 확인하고 수정
 
-```python
-self.image_publisher = self.create_publisher(Image, 'detection_image', 10)
-self.timer = self.create_timer(0.1, self.timer_callback)
+**컴포넌트 구조**
+1. `MacroList` - 매크로 리스트 표시 및 선택
+2. `MacroEditor` - 선택한 매크로의 세부 단계 표시 및 수정
 
+```vue
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useDobotMacroStore } from "@/stores/dobotMacroStore";
+import MacroList from "@/components/macro/MacroList.vue";
+import MacroEditor from "@/components/macro/MacroEditor.vue";
+
+const macroStore = useDobotMacroStore();
+
+// 매크로 데이터를 로드
+onMounted(async () => {
+  await macroStore.fetchMacros();
+});
+</script>
+
+<template>
+  <div class="macro-manager">
+    <div class="macro-list-section">
+      <MacroList />
+    </div>
+    <div class="macro-editor-section">
+      <MacroEditor />
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.macro-manager {
+  display: flex;
+  height: 100vh;
+}
+</style>
 ```
+
+### 백엔드
+- Django 및 Django REST Framework(DRF)를 사용하여 RESTful API를 개발
+- 프론트엔드와의 통합 및 데이터 관리를 위한 백엔드 시스템을 구축
+
+**주요 기능**
+- 매크로 데이터 저장 및 조회: 매크로와 그에 따른 작업 단계 관리
+- 로봇과 컨베이어 상태 저장: 작업 상태를 저장하고 이후 분석에 활용
+- JSON 기반 데이터 처리: 매크로 저장 및 실행 요청 지원
+
+**주요 모델**
+DobotMacroTask: 매크로 단위 데이터 저장
+DobotMacroStep: 작업 단계별 데이터 저장
+ResponseLog: 실행된 작업의 로그 기록
+```python
+from django.db import models
+
+class DobotMacroTask(models.Model):
+    """매크로 작업 관리"""
+    name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class DobotMacroStep(models.Model):
+    """매크로 단계별 작업 관리"""
+    task = models.ForeignKey(DobotMacroTask, on_delete=models.CASCADE, related_name="steps")
+    event = models.CharField(max_length=50)
+    position_x = models.FloatField(null=True)
+    position_y = models.FloatField(null=True)
+    position_z = models.FloatField(null=True)
+    position_r = models.FloatField(null=True)
+    gripper_state = models.CharField(max_length=10, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+```
+
+**주요 API**
+- 매크로 리스트 조회/생성: /robots/macros/
+- 특정 매크로 단계 관리: /robots/macros/<int:task_pk>/steps/
+- 최신 매크로 실행 데이터 조회: /robots/macros/last/
+```python
+from django.shortcuts import get_object_or_404
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .models import DobotMacroTask, DobotMacroStep
+
+@api_view(['GET', 'POST'])
+def task_list(request):
+    if request.method == "GET":
+        tasks = DobotMacroTask.objects.all()
+        serializer = DobotMacromacroserializer(tasks, many=True)
+        return Response(serializer.data)
+
+    elif request.method == "POST":
+        serializer = DobotMacromacroserializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+```
+
+**REST API 구조**
+| Endpoint                          | HTTP Method | Description                         |
+|-----------------------------------|-------------|-------------------------------------|
+| `/robots/macros/`                 | GET, POST   | 매크로 리스트 조회 및 생성         |
+| `/robots/macros/<int:task_pk>/`   | GET, DELETE | 특정 매크로 조회 및 삭제           |
+| `/robots/macros/<int:task_pk>/steps/` | GET, POST | 특정 매크로 단계 조회 및 추가      |
+| `/robots/macros/last/`            | GET         | 가장 최근에 실행된 매크로 조회     |
+
+```json
+  [
+    {
+      "id": 1,
+      "name": "Example Macro",
+      "created_at": "2024-11-27T12:00:00Z"
+    },
+    {
+      "id": 2,
+      "name": "Another Macro",
+      "created_at": "2024-11-26T11:00:00Z"
+    }
+  ]
+```
+
+```json
+{
+  "id": 1,
+  "name": "Example Macro",
+  "created_at": "2024-11-27T12:00:00Z",
+  "steps": [
+    {
+      "id": 101,
+      "event": "move",
+      "position_x": 10.0,
+      "position_y": 20.0,
+      "position_z": 30.0,
+      "position_r": 0.0,
+      "gripper_state": "open",
+      "created_at": "2024-11-27T12:05:00Z"
+    }
+  ]
+}
+```
+
+![백엔드](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/web%20(3).png?raw=true)
+
+---
+
+## 구현 결과
+
+### 프론트엔드 
+
+![프론트1](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/web%20(1).png?raw=true)
+![프론트2](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/web%20(2).png?raw=true)
+![프론트4](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/web%20(4).png?raw=true)
+![프론트5](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/web%20(5).png?raw=true)
+![프론트6](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/web%20(6).png?raw=true)
+![프론트7](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/web%20(7).png?raw=true)
+
+
+
