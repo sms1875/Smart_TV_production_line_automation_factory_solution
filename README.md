@@ -45,7 +45,7 @@
 
 ## 주요 기능
 
-**1. 객체 탐지 및 분류**
+### 객체 탐지 및 분류
 - Intel RealSense D435i 카메라를 통해 실시간 이미지 데이터를 캡처합니다
 - YOLOv5 모델로 보드 패널과 백 패널을 탐지 및 분류합니다
 - 감지된 객체는 컨베이어 벨트와 로봇 암으로 처리됩니다
@@ -65,7 +65,7 @@ def detect_panel():
     return None
 ```
 
-**2. 컨베이어 벨트 제어**
+### 컨베이어 벨트 제어
 - Raspberry Pi GPIO 핀을 통해 컨베이어 벨트를 제어합니다
 - 탐지된 패널 정보를 기반으로 패널을 좌우로 분류하거나 다음 작업 구역으로 이동합니다
   
@@ -77,7 +77,7 @@ def move_left():
     GPIO.output(LEFT_BELT, GPIO.LOW)
 ```
 
-**3. Dobot Magician 로봇 암 제어**
+### Dobot Magician 로봇 암 제어
 
 - Dobot Magician을 사용하여 패널을 조립 구역으로 옮깁니다
 - ROS2 Action Client를 통해 로봇 암의 위치를 제어하고 흡착컵을 사용하여 패널을 픽업합니다
@@ -92,7 +92,7 @@ def move_board_panel():
     device.suck(False)
 ```
 
-**4. RoboDK 시뮬레이션**
+### RoboDK 시뮬레이션
 
 - RoboDK를 사용하여 작업 흐름을 시뮬레이션하고 실제 로봇 동작을 최적화합니다
 - 탐지된 패널 종류에 따라 RoboDK에서 작업 시퀀스를 실행합니다
@@ -231,7 +231,7 @@ async def main():
 asyncio.run(main())
 ```
 
-**5. ROS2 기반 통신 및 동기화**
+### ROS2 기반 통신 및 동기화
 
 - ROS2를 통해 장치 간 데이터를 송수신하고 동작을 제어합니다
 - YOLOv5의 탐지 결과를 ROS2 토픽으로 퍼블리시하며, Dobot Magician 및 컨베이어 벨트 제어를 동기화합니다
