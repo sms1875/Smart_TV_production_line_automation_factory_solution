@@ -197,12 +197,13 @@ elif command == '3':  # 서보 모터 180도 후 초기화
     self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
     self.print_status()
  elif command == '5':  # 서보 모터 90도 후 초기화
-            print("Moving servo to 90 degrees")
-            self.servo_motor.set_angle(Config.SERVO_MIN_POSITION)
-            time.sleep(6)  # 대기
-            print("Resetting servo to initial position")
-            self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
-            self.print_status()
+    print("Moving servo to 90 degrees")
+    self.servo_motor.set_angle(Config.SERVO_MIN_POSITION)
+    time.sleep(6)  # 대기
+    print("Resetting servo to initial position")
+    self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
+    self.print_status()
+```
 
 ### Dobot Magician 로봇 암 제어
 
