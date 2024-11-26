@@ -67,6 +67,8 @@ def detect_panel():
 
 ### 컨베이어 벨트 제어
 
+![컨베이어벨트](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/%EC%BB%A8%EB%B2%A0%EC%9D%B4%EC%96%B4%EB%B2%A8%ED%8A%B8.gif)
+
 - Raspberry Pi GPIO 핀을 통해 컨베이어 벨트를 제어합니다
 - 탐지된 패널 정보를 기반으로 패널을 좌우로 분류하거나 다음 작업 구역으로 이동합니다
 
@@ -207,6 +209,7 @@ elif command == '3':  # 서보 모터 180도 후 초기화
 
 ### Dobot Magician 로봇 암 제어
 
+![두봇](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/%EB%91%90%EB%B4%87.gif)
 - Dobot Magician을 사용하여 패널을 조립 구역으로 옮깁니다
 - ROS2 Action Client를 통해 로봇 암의 위치를 제어하고 흡착컵을 사용하여 패널을 픽업합니다
   
