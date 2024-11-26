@@ -627,4 +627,7 @@ def task_list(request):
 ![프론트7](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/web%20(7).png?raw=true)
 
 
+### 로봇 제어
+![매크로작업](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/%EB%A7%A4%ED%81%AC%EB%A1%9C%EC%9E%91%EC%97%85.gif?raw=true)
+
 
