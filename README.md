@@ -66,16 +66,143 @@ def detect_panel():
 ```
 
 ### 컨베이어 벨트 제어
+
 - Raspberry Pi GPIO 핀을 통해 컨베이어 벨트를 제어합니다
 - 탐지된 패널 정보를 기반으로 패널을 좌우로 분류하거나 다음 작업 구역으로 이동합니다
-  
+
+**컨베이어 벨트의 구조 및 역할**
+
+1. 스텝 모터 (Stepper Motor)
+- 컨베이어 벨트의 방향과 속도를 제어합니다.
+- 모터는 GPIO 핀을 통해 신호를 받아 작동하며, 속도와 가속도는 코드에서 설정 가능합니다.
+- 방향:
+  - 1 (CW): 시계 방향으로 이동.
+  - -1 (CCW): 반시계 방향으로 이동.
+- 속도:
+  - 초기 속도(INITIAL_SPEED)에서 시작하여 목표 속도(TARGET_SPEED)까지 점진적으로 가속/감속합니다.
+    
+2. 서보 모터 (Servo Motor)
+- 패널의 위치를 조정하거나 추가적인 분류 작업을 수행합니다.
+- 각도는 90도(최소), 135도(초기 위치), 180도(최대)로 설정 가능합니다.
+
+**컨베이어 벨트 제어 코드 구현**
+
+1. 스텝 모터 동작
+- 스텝 모터는 컨베이어 벨트의 움직임을 담당하며, 방향, 속도, 가속/감속을 설정할 수 있습니다.
+
 ```python
-def move_left():
-    """컨베이어 벨트 좌측 이동"""
-    GPIO.output(LEFT_BELT, GPIO.HIGH)
-    time.sleep(2)
-    GPIO.output(LEFT_BELT, GPIO.LOW)
+class StepperMotor:
+    def __init__(self, gpio_manager):
+        self.gpio = gpio_manager
+        self.speed = Config.INITIAL_SPEED  # 초기 속도
+        self.target_speed = Config.TARGET_SPEED  # 목표 속도
+        self.ratio = Config.ACCELERATION_RATIO  # 가속 비율
+        self.is_running = False  # 동작 상태
+        self.direction = 0  # 1: CW, -1: CCW, 0: 정지
+        self.is_accelerating = False
+
+        # GPIO 핀 설정
+        self.gpio.setup_pin(Config.DIR_PIN, "dir")  # 방향 제어 핀
+        self.gpio.setup_pin(Config.STEP_PIN, "step")  # 스텝 제어 핀
+        self.gpio.setup_pin(Config.ENABLE_PIN, "enable")  # 활성화 핀
+
+    def set_direction(self, direction):
+        """모터 방향 설정"""
+        self.direction = direction
+        self.gpio.set_value(Config.DIR_PIN, 0 if direction == 1 else 1)
+
+    def start(self):
+        """모터 시작"""
+        if not self.is_running:
+            self.is_running = True
+            threading.Thread(target=self._run).start()
+
+    def stop(self):
+        """모터 정지"""
+        self.direction = 0
+        self.is_accelerating = False
+
+    def _run(self):
+        """스텝 모터의 동작 루프"""
+        self.gpio.set_value(Config.ENABLE_PIN, 0)  # 모터 활성화
+        while self.is_running:
+            if self.is_accelerating and self.speed > self.target_speed:
+                self.speed -= self.ratio  # 가속
+            elif not self.is_accelerating and self.speed < Config.INITIAL_SPEED:
+                self.speed += self.ratio  # 감속
+
+            # 모터 정지 조건 확인
+            if self.direction == 0 and self.speed >= Config.INITIAL_SPEED:
+                self.is_running = False
+
+            # 스텝 신호 생성
+            self.gpio.set_value(Config.STEP_PIN, 1)
+            time.sleep(self.speed)
+            self.gpio.set_value(Config.STEP_PIN, 0)
+            time.sleep(self.speed)
+
+    def disable(self):
+        """모터 비활성화"""
+        self.gpio.set_value(Config.ENABLE_PIN, 1)
 ```
+
+2. 서보 모터 동작
+- 서보 모터는 패널 위치 조정을 위해 사용되며, 각도를 조정하여 다양한 동작을 수행합니다.
+
+```python
+class ServoMotor:
+    def __init__(self, gpio_manager):
+        self.gpio = gpio_manager
+        self.gpio.setup_pin(Config.SERVO_PIN, "servo")
+
+    def set_angle(self, angle):
+        """서보 각도 설정"""
+        pulse_width = (angle / 270) * (0.0025 - 0.0005) + 0.0005
+        for _ in range(10):  # 안정적인 위치 이동
+            self.gpio.set_value(Config.SERVO_PIN, 1)
+            time.sleep(pulse_width)
+            self.gpio.set_value(Config.SERVO_PIN, 0)
+            time.sleep(0.02 - pulse_width)
+```
+
+**컨베이어 벨트의 주요 명령 처리**
+- 컨베이어 벨트 동작은 서버로부터 수신한 명령에 따라 수행됩니다.
+
+- 명령 '1'을 수신하면 컨베이어 벨트가 시계 방향으로 움직이기 시작합니다.
+- 명령 '2'을 수신하면 모터를 정지합니다.
+- 명령 '3', '5'을 수신하면 서보 모터를 움직여 패널을 분류합니다.
+
+```python
+if command == '1':  # 모터 시계 방향
+    if not self.motor_running:
+        print("Starting motor CW")
+        self.stepper_motor.set_direction(1)
+        self.stepper_motor.start()
+        self.motor_running = True
+    else:
+        print("Stopping motor CW")
+        self.stepper_motor.stop()
+        self.motor_running = False
+    self.print_status()
+elif command == '2':  # 모터 정지
+    print("Stopping motor immediately")
+    self.stepper_motor.stop()
+    self.motor_running = False
+    self.print_status()
+elif command == '3':  # 서보 모터 180도 후 초기화
+    print("Moving servo to 180 degrees")
+    self.servo_motor.set_angle(Config.SERVO_MAX_POSITION)
+    time.sleep(6)  # 대기
+    print("Resetting servo to initial position")
+    self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
+    self.print_status()
+ elif command == '5':  # 서보 모터 90도 후 초기화
+            print("Moving servo to 90 degrees")
+            self.servo_motor.set_angle(Config.SERVO_MIN_POSITION)
+            time.sleep(6)  # 대기
+            print("Resetting servo to initial position")
+            self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
+            self.print_status()
 
 ### Dobot Magician 로봇 암 제어
 
