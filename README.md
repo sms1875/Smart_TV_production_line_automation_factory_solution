@@ -1,8 +1,9 @@
-
 # 스마트 TV 생산 라인 자동화 솔루션
 
 ## 프로젝트 개요
+
 스마트 TV 생산 공정의 효율성을 극대화하기 위한 통합 자동화 솔루션입니다
+
 - Intel RealSense D435i 카메라와 YOLOv5 모델을 사용하여 패널의 종류를 실시간으로 분류합니다
 - Dobot Magician 로봇 암 및 컨베이어 벨트를 제어하여 패널을 분류 및 이동합니다
 - ROS2 기반으로 데이터 통신과 장비 간 동작을 관리하며 RoboDK 시뮬레이션을 통해 작업 환경을 테스트합니다
@@ -10,6 +11,7 @@
 ---
 
 ## 시연 영상
+
 [스마트 TV 생산 라인 자동화 시연 영상](https://www.youtube.com/watch?v=IgKFjTNAdM4)
 
 ---
@@ -19,37 +21,38 @@
 - **운영 체제**: Ubuntu 20.04 (서버), Raspberry Pi OS (컨베이어 제어)
 - **프로그래밍 언어**: Python 3.8
 - **주요 하드웨어**:
-  - Dobot Magician (로봇)
-  - Intel RealSense D435i (카메라)
-  - Raspberry Pi (컨베이어 제어)
+    - Dobot Magician (로봇)
+    - Intel RealSense D435i (카메라)
+    - Raspberry Pi (컨베이어 제어)
 - **주요 소프트웨어**:
-  - YOLOv5 (객체 탐지 모델)
-  - ROS2 (로봇 제어 및 데이터 통신)
-  - RoboDK (시뮬레이션)
+    - YOLOv5 (객체 탐지 모델)
+    - ROS2 (로봇 제어 및 데이터 통신)
+    - RoboDK (시뮬레이션)
 
 ---
 
 ## 작업 흐름
 
-* 로봇 암 조립:
-  - Dobot Magician이 패널을 흡착하여 조립 구역으로 이동
-* 패널 탐지 및 분류:
-  - Intel RealSense D435i 카메라가 이미지를 캡처
-  - YOLOv5 모델이 패널을 분류
-* 컨베이어 벨트 동작:
-  - 탐지된 패널 정보를 기반으로 좌우 이동
-* RoboDK 시뮬레이션:
-  - 패널 종류에 따라 작업을 시뮬레이션
-  
+- 로봇 암 조립:
+    - Dobot Magician이 패널을 흡착하여 조립 구역으로 이동
+- 패널 탐지 및 분류:
+    - Intel RealSense D435i 카메라가 이미지를 캡처
+    - YOLOv5 모델이 패널을 분류
+- 컨베이어 벨트 동작:
+    - 탐지된 패널 정보를 기반으로 좌우 이동
+- RoboDK 시뮬레이션:
+    - 패널 종류에 따라 작업을 시뮬레이션
+
 ---
 
 ## 주요 기능
 
 ### 객체 탐지 및 분류
+
 - Intel RealSense D435i 카메라를 통해 실시간 이미지 데이터를 캡처합니다
 - YOLOv5 모델로 보드 패널과 백 패널을 탐지 및 분류합니다
 - 감지된 객체는 컨베이어 벨트와 로봇 암으로 처리됩니다
-  
+
 ```python
 def detect_panel():
     """YOLOv5를 이용한 패널 탐지"""
@@ -63,14 +66,15 @@ def detect_panel():
             elif class_id == 1:
                 return "back"  # 백 패널
     return None
+
 ```
 
 ### 컨베이어 벨트 제어
 
-![컨베이어벨트](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/%EC%BB%A8%EB%B2%A0%EC%9D%B4%EC%96%B4%EB%B2%A8%ED%8A%B8.gif)
-
 - Raspberry Pi GPIO 핀을 통해 컨베이어 벨트를 제어합니다
 - 탐지된 패널 정보를 기반으로 패널을 좌우로 분류하거나 다음 작업 구역으로 이동합니다
+
+![컨베이어벨트](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/%EC%BB%A8%EB%B2%A0%EC%9D%B4%EC%96%B4%EB%B2%A8%ED%8A%B8.gif?raw=true)
 
 **컨베이어 벨트의 구조 및 역할**
 
@@ -78,12 +82,11 @@ def detect_panel():
 - 컨베이어 벨트의 방향과 속도를 제어합니다.
 - 모터는 GPIO 핀을 통해 신호를 받아 작동하며, 속도와 가속도는 코드에서 설정 가능합니다.
 - 방향:
-  - 1 (CW): 시계 방향으로 이동.
-  - -1 (CCW): 반시계 방향으로 이동.
+    - 1 (CW): 시계 방향으로 이동.
+    - 1 (CCW): 반시계 방향으로 이동.
 - 속도:
-  - 초기 속도(INITIAL_SPEED)에서 시작하여 목표 속도(TARGET_SPEED)까지 점진적으로 가속/감속합니다.
-    
-2. 서보 모터 (Servo Motor)
+    - 초기 속도(INITIAL_SPEED)에서 시작하여 목표 속도(TARGET_SPEED)까지 점진적으로 가속/감속합니다.
+1. 서보 모터 (Servo Motor)
 - 패널의 위치를 조정하거나 추가적인 분류 작업을 수행합니다.
 - 각도는 90도(최소), 135도(초기 위치), 180도(최대)로 설정 가능합니다.
 
@@ -146,9 +149,10 @@ class StepperMotor:
     def disable(self):
         """모터 비활성화"""
         self.gpio.set_value(Config.ENABLE_PIN, 1)
+
 ```
 
-2. 서보 모터 동작
+1. 서보 모터 동작
 - 서보 모터는 패널 위치 조정을 위해 사용되며, 각도를 조정하여 다양한 동작을 수행합니다.
 
 ```python
@@ -165,11 +169,12 @@ class ServoMotor:
             time.sleep(pulse_width)
             self.gpio.set_value(Config.SERVO_PIN, 0)
             time.sleep(0.02 - pulse_width)
+
 ```
 
 **컨베이어 벨트의 주요 명령 처리**
-- 컨베이어 벨트 동작은 서버로부터 수신한 명령에 따라 수행됩니다.
 
+- 컨베이어 벨트 동작은 서버로부터 수신한 명령에 따라 수행됩니다.
 - 명령 '1'을 수신하면 컨베이어 벨트가 시계 방향으로 움직이기 시작합니다.
 - 명령 '2'을 수신하면 모터를 정지합니다.
 - 명령 '3', '5'을 수신하면 서보 모터를 움직여 패널을 분류합니다.
@@ -205,17 +210,19 @@ elif command == '3':  # 서보 모터 180도 후 초기화
     print("Resetting servo to initial position")
     self.servo_motor.set_angle(Config.SERVO_INITIAL_POSITION)
     self.print_status()
+
 ```
 
 ### Dobot Magician 로봇 암 제어
 
-![두봇](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/%EB%91%90%EB%B4%87.gif)
 - Dobot Magician을 사용하여 패널을 조립 구역으로 옮깁니다
 - ROS2 Action Client를 통해 로봇 암의 위치를 제어하고 흡착컵을 사용하여 패널을 픽업합니다
-  
+
+![두봇](https://github.com/sms1875/Smart_TV_production_line_automation_factory_solution/blob/main/assets/img/%EB%91%90%EB%B4%87.gif?raw=true)
+
 **흡착컵 동작 구현**
 
-- 흡착컵은 패널을 잡고 놓는 데 사용됩니다. 
+- 흡착컵은 패널을 잡고 놓는 데 사용됩니다.
 - set_suction 메서드는 흡착 활성화 또는 비활성화를 수행합니다.
 - 흡착 상태를 제어하기 위해 state 값이 "on"이면 흡착컵을 활성화하고, "off"면 비활성화합니다.
 
@@ -234,7 +241,9 @@ def set_suction(self, enable: bool):
 
     future = self.suction_service_client.call_async(req)
     future.add_done_callback(self.suction_response_callback)
+
 ```
+
 **PTP 이동 명령 구현**
 
 - send_ptp_goal 메서드는 두봇이 지정된 위치로 이동하도록 합니다.
@@ -257,6 +266,7 @@ def send_ptp_goal(self, motion_type, target_pose):
     self.ptp_action_client.wait_for_server()
     future = self.ptp_action_client.send_goal_async(goal_msg)
     future.add_done_callback(self.ptp_goal_response_callback)
+
 ```
 
 **Homing 서비스 호출**
@@ -281,9 +291,11 @@ def execute_homing(self):
         self.get_logger().info(f'Homing service completed successfully: {future.result()}')
     else:
         self.get_logger().error('Homing service failed.')
+
 ```
 
 **JSON 작업 실행**
+
 - 작업을 JSON 파일에서 저장하고 읽어 순차적으로 실행합니다.
 - 작업 단계는 이동(move)과 흡착컵 제어(gripper)로 구성됩니다.
 
@@ -305,6 +317,7 @@ def execute_task(dobot_controller, task):
         elif step["event"] == "gripper":
             dobot_controller.set_suction(step["state"] == "on")
             time.sleep(Config.SUCTION_WAIT_TIME)
+
 ```
 
 ### RoboDK 시뮬레이션
@@ -334,21 +347,21 @@ flowchart TD
     BackTask --> TaskEnd
     TaskEnd --> BasicTask
 
-
 ```
 
 **핵심 변수 및 상태 관리**
+
 - 패널 유형별 수량을 관리하고, 작업 흐름에 반영
 
 ```python
 panel_count = {"board": 0, "back": 0}  # 보드 및 백 패널 카운트
 simulation_running = False  # 현재 시뮬레이션 상태
 current_step = 0  # 작업 단계 관리
+
 ```
 
-
 **패널 데이터 수집 (소켓 통신)**
-  
+
 - 서버와의 연결을 통해 패널 정보를 실시간으로 수집하고 처리
 - 패널 유형별로 카운트를 증가시키며, 작업 단계에 반영
 
@@ -371,41 +384,43 @@ async def handle_socket():
         except Exception as e:
             print(f"Socket error: {e}")
             await asyncio.sleep(5)
+
 ```
 
 **작업 상태 기반 작업 흐름**
-  
+
 - 작업은 단계별로 실행되며, 보드와 백 패널의 우선순위에 따라 스케줄링됨
 
 ```python
 async def simulation_task():
     """시뮬레이션 상태와 패널 개수를 기반으로 작업 수행."""
     global simulation_running, panel_count, current_step
-    
+
     while True:
         if not simulation_running:
             if current_step == 0:  # 초기 준비 단계
                 await asyncio.to_thread(run_preparation)
                 current_step = 1  # 다음 단계로 이동
-                
+
             elif current_step == 1 and panel_count["board"] > 0:  # 보드 패널 작업
                 panel_count["board"] -= 1
                 await asyncio.to_thread(run_board_panel_task)
                 current_step = 2  # 다음 단계로 이동
-                
+
             elif current_step == 2 and panel_count["back"] > 0:  # 백 패널 작업
                 panel_count["back"] -= 1
                 await asyncio.to_thread(run_back_panel_task)
                 current_step = 0  # 초기 단계로 복귀
-                
+
             else:  # 대기 상태
                 await asyncio.sleep(0.1)
         else:
             await asyncio.sleep(0.1)
+
 ```
 
 **작업 단계별 세부 구현**
-  
+
 - 각 작업은 RoboDK API를 통해 시뮬레이션 및 로봇 제어와 통합
 
 ```python
@@ -429,10 +444,11 @@ def run_back_panel_task():
     job20()  # 조립 작업
     job21(process_count)  # Foam 추가 작업
     job23()  # 작업 완료
+
 ```
 
 **메인 실행**
-  
+
 - 비동기 루프를 활용하여 소켓 통신과 작업 흐름을 병렬로 관리
 
 ```python
@@ -444,16 +460,16 @@ async def main():
 
 # 비동기 루프 실행
 asyncio.run(main())
+
 ```
 
 ### ROS2 기반 통신 및 동기화
 
 - ROS2를 통해 장치 간 데이터를 송수신하고 동작을 제어합니다
 - YOLOv5의 탐지 결과를 ROS2 토픽으로 퍼블리시하며, Dobot Magician 및 컨베이어 벨트 제어를 동기화합니다
-  
+
 ```python
 self.image_publisher = self.create_publisher(Image, 'detection_image', 10)
 self.timer = self.create_timer(0.1, self.timer_callback)
+
 ```
-
-
